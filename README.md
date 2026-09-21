@@ -23,6 +23,14 @@ docker compose logs -f consumer
 
 ## Uruchomienie testów (tu pracujesz)
 
+Po zmianach w kodzie testów lub helperach przebuduj obraz i uruchom testy jednym poleceniem:
+
+```bash
+docker compose --profile test build tests && docker compose --profile test run --rm tests
+```
+
+Przy ponownym uruchomieniu testów bez zmian w kodzie wystarczy:
+
 ```bash
 docker compose --profile test run --rm tests
 ```
@@ -62,14 +70,8 @@ docker compose down -v
 
 ### Uwagi do uruchomienia
 
-Testy uruchamiam zgodnie z konfiguracją Docker Compose. Po zmianach w `tests/__tests__` lub `tests/src` należy przebudować obraz testowy przed uruchomieniem testów:
-
-```bash
-docker compose --profile test build tests
-docker compose --profile test run --rm tests
-```
-
-Nie używam `--no-cache` przy normalnym cyklu pracy — standardowy Docker build poprawnie wykorzystuje cache.
+* Po zmianach w `tests/__tests__` lub `tests/src` obraz testowy należy przebudować przed uruchomieniem testów. Przy kolejnych uruchomieniach bez zmian można użyć istniejącego obrazu.
+* Nie używam `--no-cache` przy normalnym cyklu pracy — standardowy Docker build poprawnie wykorzystuje cache.
 
 ### Podejście do testowania
 
