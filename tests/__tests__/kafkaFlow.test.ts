@@ -35,4 +35,18 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
     await disconnectProducer();
   });
 
+  it("przetwarza poprawną wiadomość (happy path)", async () => {
+    const order = makeTestOrder();
+
+    await sendOrder(producer, order);
+
+    const result = await waitForMessage(
+      ORDERS_PROCESSED_TOPIC,
+      (message) => message.orderId === order.orderId,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.orderId).toBe(order.orderId);
+    expect(result.status).toBe("PROCESSED");
+  });
 });
