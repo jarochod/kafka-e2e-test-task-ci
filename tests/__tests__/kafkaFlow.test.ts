@@ -100,4 +100,29 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
       expect(result.status).toBe("PROCESSED");
     }
   });
+
+  it("wysyła wiadomość z brakującym polem do DLQ", async () => {
+  const order = makeTestOrder();
+  const { amount: _amount, ...invalidOrder } = order;
+
+  await sendRaw(producer, JSON.stringify(invalidOrder), order.orderId);
+
+  const dlqResult = await waitForMessage(
+    ORDERS_DLQ_TOPIC,
+    (message) =>
+      message.originalMessage?.orderId === order.orderId,
+  );
+
+  expect(dlqResult).not.toBeNull();
+  expect(dlqResult.error).toBe("Brakujące pola: [amount]");
+  expect(dlqResult.originalMessage).toEqual(invalidOrder);
+
+  const processedResult = await waitForMessage(
+    ORDERS_PROCESSED_TOPIC,
+    (message) => message.orderId === order.orderId,
+    2,
+  );
+
+  expect(processedResult).toBeNull();
+});
 });
