@@ -125,4 +125,23 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
   expect(processedResult).toBeNull();
 });
+
+it("wysyła niepoprawny JSON do DLQ", async () => {
+  const invalidJson = "{not-a-valid-json";
+  const key = `invalid-json-${Date.now()}`;
+
+  await sendRaw(producer, invalidJson, key);
+
+  const dlqResult = await waitForMessage(
+    ORDERS_DLQ_TOPIC,
+    (message) =>
+      message.error?.startsWith("Niepoprawny JSON:") &&
+      message.raw === invalidJson,
+  );
+
+  expect(dlqResult).not.toBeNull();
+  expect(dlqResult.error).toContain("Niepoprawny JSON:");
+  expect(dlqResult.raw).toBe(invalidJson);
+});
+
 });
