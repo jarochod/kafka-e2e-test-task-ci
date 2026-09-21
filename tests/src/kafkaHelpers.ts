@@ -145,9 +145,12 @@ export async function waitForMessage(
       settled = true;
       clearTimeout(timer);
 
-      resolve(result);
-
-      void consumer.disconnect().catch(reject);
+      setImmediate(() => {
+        consumer
+          .disconnect()
+          .then(() => resolve(result))
+          .catch(reject);
+      });
     };
 
     const timer = setTimeout(() => {
@@ -158,6 +161,7 @@ export async function waitForMessage(
       .run({
         eachMessage: async ({ message }: EachMessagePayload) => {
           if (settled) return;
+
           const parsed = tryParse(message.value);
           if (parsed !== null && matchFn(parsed)) {
             finish(parsed);
@@ -165,8 +169,10 @@ export async function waitForMessage(
         },
       })
       .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
+        if (!settled) {
+          clearTimeout(timer);
+          reject(err);
+        }
       });
   });
 }
