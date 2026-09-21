@@ -61,10 +61,25 @@ docker compose down -v
 ## Twoje notatki (uzupełnij przed oddaniem zadania)
 
 ### Uwagi do uruchomienia
-_(jeśli coś zmieniłeś/aś względem domyślnej konfiguracji, opisz to tutaj)_
+
+Testy uruchamiam zgodnie z konfiguracją Docker Compose. Po zmianach w `tests/__tests__` lub `tests/src` należy przebudować obraz testowy przed uruchomieniem testów:
+
+```bash
+docker compose --profile test build tests
+docker compose --profile test run --rm tests
+```
+
+Nie używam `--no-cache` przy normalnym cyklu pracy — standardowy Docker build poprawnie wykorzystuje cache.
 
 ### Podejście do testowania
-_(2–4 zdania: jak podszedłeś/aś do problemu, jakie decyzje podjąłeś/aś)_
+
+* Testy sprawdzają pełny przepływ E2E: wysyłają wiadomości na `orders` i weryfikują wynik na `orders-processed` lub `orders-dlq`.
+* Do synchronizacji używam `waitForMessage()` i `collectMessages()` z timeoutem zamiast stałych opóźnień. Matchery wykorzystują unikalne `orderId`, dzięki czemu testy nie dopasowują przypadkowo starszych wiadomości.
+* Poprawiłem kolejność cleanupu w `waitForMessage()` i `collectMessages()`, tak aby `consumer.disconnect()` nie blokował zwrócenia wyniku do asercji.
+* Testowe consumery mają unikalne `groupId` i czytają topic od początku, co zapewnia izolację testów.
 
 ### Znane ograniczenia / co zrobiłbym/zrobiłabym inaczej mając więcej czasu
-_(krótka lista)_
+
+* Negatywne testy, które sprawdzają brak wiadomości na topicu, muszą odczekać do końca ustawionego timeoutu. Dodatkowo graceful disconnect KafkaJS może wydłużyć rzeczywisty czas takiego testu.
+* Testy są uruchamiane sekwencyjnie (`--runInBand`), co upraszcza izolację i ogranicza potencjalne problemy związane z równoległym dostępem do Kafki, ale nie maksymalizuje szybkości wykonania.
+* Przy większej liczbie testów rozważyłbym dedykowane mechanizmy przygotowania/czyszczenia danych testowych, aby ograniczyć zależność od historii wiadomości na topicach.
