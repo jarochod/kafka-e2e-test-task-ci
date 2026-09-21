@@ -69,4 +69,35 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
     expect(result.amount).toBe(order.amount);
     expect(result.status).toBe("PROCESSED");
   });
+
+  it("przetwarza wiele wiadomości bez utraty i duplikacji", async () => {
+    const orders = Array.from({ length: 10 }, () => makeTestOrder());
+
+    for (const order of orders) {
+      await sendOrder(producer, order);
+    }
+
+    const orderIds = new Set(orders.map((order) => order.orderId));
+
+    const results = await collectMessages(
+      ORDERS_PROCESSED_TOPIC,
+      (message) => orderIds.has(message.orderId),
+      orders.length,
+    );
+
+    expect(results).toHaveLength(orders.length);
+
+    const processedOrderIds = results.map((message) => message.orderId);
+
+    expect(new Set(processedOrderIds).size).toBe(orders.length);
+
+    for (const order of orders) {
+      const result = results.find(
+        (message) => message.orderId === order.orderId,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.status).toBe("PROCESSED");
+    }
+  });
 });
