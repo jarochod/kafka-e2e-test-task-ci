@@ -140,19 +140,18 @@ export async function waitForMessage(
   return new Promise((resolve, reject) => {
     let settled = false;
 
-    const finish = async (result: unknown) => {
+    const finish = (result: unknown) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try {
-        await consumer.disconnect();
-      } finally {
-        resolve(result);
-      }
+
+      resolve(result);
+
+      void consumer.disconnect().catch(reject);
     };
 
     const timer = setTimeout(() => {
-      void finish(null);
+      finish(null);
     }, timeoutSeconds * 1000);
 
     consumer
@@ -161,7 +160,7 @@ export async function waitForMessage(
           if (settled) return;
           const parsed = tryParse(message.value);
           if (parsed !== null && matchFn(parsed)) {
-            await finish(parsed);
+            finish(parsed);
           }
         },
       })
