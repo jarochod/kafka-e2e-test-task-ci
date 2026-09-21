@@ -13,8 +13,6 @@ import { Producer } from "kafkajs";
 import {
   ORDERS_DLQ_TOPIC,
   ORDERS_PROCESSED_TOPIC,
-  ORDERS_TOPIC,
-  Order,
   collectMessages,
   disconnectProducer,
   getProducer,
