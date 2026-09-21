@@ -49,4 +49,24 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
     expect(result.orderId).toBe(order.orderId);
     expect(result.status).toBe("PROCESSED");
   });
+
+  it("zachowuje oryginalne dane w przetworzonej wiadomości", async () => {
+    const order = makeTestOrder({
+      customer: "Jan Kowalski",
+      amount: 456.78,
+    });
+
+    await sendOrder(producer, order);
+
+    const result = await waitForMessage(
+      ORDERS_PROCESSED_TOPIC,
+      (message) => message.orderId === order.orderId,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result.orderId).toBe(order.orderId);
+    expect(result.customer).toBe(order.customer);
+    expect(result.amount).toBe(order.amount);
+    expect(result.status).toBe("PROCESSED");
+  });
 });
