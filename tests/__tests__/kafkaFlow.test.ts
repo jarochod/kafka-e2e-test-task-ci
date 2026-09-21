@@ -102,46 +102,64 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
   });
 
   it("wysyła wiadomość z brakującym polem do DLQ", async () => {
-  const order = makeTestOrder();
-  const { amount: _amount, ...invalidOrder } = order;
+    const order = makeTestOrder();
+    const { amount: _amount, ...invalidOrder } = order;
 
-  await sendRaw(producer, JSON.stringify(invalidOrder), order.orderId);
+    await sendRaw(producer, JSON.stringify(invalidOrder), order.orderId);
 
-  const dlqResult = await waitForMessage(
-    ORDERS_DLQ_TOPIC,
-    (message) =>
-      message.originalMessage?.orderId === order.orderId,
-  );
+    const dlqResult = await waitForMessage(
+      ORDERS_DLQ_TOPIC,
+      (message) => message.originalMessage?.orderId === order.orderId,
+    );
 
-  expect(dlqResult).not.toBeNull();
-  expect(dlqResult.error).toBe("Brakujące pola: [amount]");
-  expect(dlqResult.originalMessage).toEqual(invalidOrder);
+    expect(dlqResult).not.toBeNull();
+    expect(dlqResult.error).toBe("Brakujące pola: [amount]");
+    expect(dlqResult.originalMessage).toEqual(invalidOrder);
 
-  const processedResult = await waitForMessage(
-    ORDERS_PROCESSED_TOPIC,
-    (message) => message.orderId === order.orderId,
-    2,
-  );
+    const processedResult = await waitForMessage(
+      ORDERS_PROCESSED_TOPIC,
+      (message) => message.orderId === order.orderId,
+      2,
+    );
 
-  expect(processedResult).toBeNull();
-});
+    expect(processedResult).toBeNull();
+  });
 
-it("wysyła niepoprawny JSON do DLQ", async () => {
-  const invalidJson = "{not-a-valid-json";
-  const key = `invalid-json-${Date.now()}`;
+  it("wysyła niepoprawny JSON do DLQ", async () => {
+    const invalidJson = "{not-a-valid-json";
+    const key = `invalid-json-${Date.now()}`;
 
-  await sendRaw(producer, invalidJson, key);
+    await sendRaw(producer, invalidJson, key);
 
-  const dlqResult = await waitForMessage(
-    ORDERS_DLQ_TOPIC,
-    (message) =>
-      message.error?.startsWith("Niepoprawny JSON:") &&
-      message.raw === invalidJson,
-  );
+    const dlqResult = await waitForMessage(
+      ORDERS_DLQ_TOPIC,
+      (message) =>
+        message.error?.startsWith("Niepoprawny JSON:") &&
+        message.raw === invalidJson,
+    );
 
-  expect(dlqResult).not.toBeNull();
-  expect(dlqResult.error).toContain("Niepoprawny JSON:");
-  expect(dlqResult.raw).toBe(invalidJson);
-});
+    expect(dlqResult).not.toBeNull();
+    expect(dlqResult.error).toContain("Niepoprawny JSON:");
+    expect(dlqResult.raw).toBe(invalidJson);
+  });
 
+  it("przetwarza wiadomość w limicie czasu (SLA 10s)", async () => {
+    const order = makeTestOrder();
+    const start = Date.now();
+
+    await sendOrder(producer, order);
+
+    const result = await waitForMessage(
+      ORDERS_PROCESSED_TOPIC,
+      (message) => message.orderId === order.orderId,
+      10,
+    );
+
+    const elapsed = Date.now() - start;
+
+    expect(result).not.toBeNull();
+    expect(result.orderId).toBe(order.orderId);
+    expect(result.status).toBe("PROCESSED");
+    expect(elapsed).toBeLessThanOrEqual(10_000);
+  });
 });
