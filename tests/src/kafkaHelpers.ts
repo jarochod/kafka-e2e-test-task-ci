@@ -195,37 +195,42 @@ export async function collectMessages(
   return new Promise((resolve, reject) => {
     let settled = false;
 
-    const finish = async () => {
+    const finish = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try {
-        await consumer.disconnect();
-      } finally {
-        resolve(found);
-      }
+
+      setImmediate(() => {
+        consumer
+          .disconnect()
+          .then(() => resolve(found))
+          .catch(reject);
+      });
     };
 
     const timer = setTimeout(() => {
-      void finish();
+      finish();
     }, timeoutSeconds * 1000);
 
     consumer
       .run({
         eachMessage: async ({ message }: EachMessagePayload) => {
           if (settled) return;
+
           const parsed = tryParse(message.value);
           if (parsed !== null && matchFn(parsed)) {
             found.push(parsed);
             if (found.length >= expectedCount) {
-              await finish();
+              finish();
             }
           }
         },
       })
       .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
+        if (!settled) {
+          clearTimeout(timer);
+          reject(err);
+        }
       });
   });
 }
