@@ -11,8 +11,10 @@
  */
 import { Producer } from "kafkajs";
 import {
+  DlqMessage,
   ORDERS_DLQ_TOPIC,
   ORDERS_PROCESSED_TOPIC,
+  ProcessedOrder,
   collectMessages,
   disconnectProducer,
   getProducer,
@@ -38,14 +40,14 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     await sendOrder(producer, order);
 
-    const result = await waitForMessage(
+    const result = await waitForMessage<ProcessedOrder>(
       ORDERS_PROCESSED_TOPIC,
       (message) => message.orderId === order.orderId,
     );
 
     expect(result).not.toBeNull();
-    expect(result.orderId).toBe(order.orderId);
-    expect(result.status).toBe("PROCESSED");
+    expect(result!.orderId).toBe(order.orderId);
+    expect(result!.status).toBe("PROCESSED");
   });
 
   it("zachowuje oryginalne dane w przetworzonej wiadomości", async () => {
@@ -56,16 +58,16 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     await sendOrder(producer, order);
 
-    const result = await waitForMessage(
+    const result = await waitForMessage<ProcessedOrder>(
       ORDERS_PROCESSED_TOPIC,
       (message) => message.orderId === order.orderId,
     );
 
     expect(result).not.toBeNull();
-    expect(result.orderId).toBe(order.orderId);
-    expect(result.customer).toBe(order.customer);
-    expect(result.amount).toBe(order.amount);
-    expect(result.status).toBe("PROCESSED");
+    expect(result!.orderId).toBe(order.orderId);
+    expect(result!.customer).toBe(order.customer);
+    expect(result!.amount).toBe(order.amount);
+    expect(result!.status).toBe("PROCESSED");
   });
 
   it("przetwarza wiele wiadomości bez utraty i duplikacji", async () => {
@@ -77,7 +79,7 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     const orderIds = new Set(orders.map((order) => order.orderId));
 
-    const results = await collectMessages(
+    const results = await collectMessages<ProcessedOrder>(
       ORDERS_PROCESSED_TOPIC,
       (message) => orderIds.has(message.orderId),
       orders.length,
@@ -95,7 +97,7 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
       );
 
       expect(result).toBeDefined();
-      expect(result.status).toBe("PROCESSED");
+      expect(result!.status).toBe("PROCESSED");
     }
   });
 
@@ -105,16 +107,16 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     await sendRaw(producer, JSON.stringify(invalidOrder), order.orderId);
 
-    const dlqResult = await waitForMessage(
+    const dlqResult = await waitForMessage<DlqMessage>(
       ORDERS_DLQ_TOPIC,
       (message) => message.originalMessage?.orderId === order.orderId,
     );
 
     expect(dlqResult).not.toBeNull();
-    expect(dlqResult.error).toBe("Brakujące pola: [amount]");
-    expect(dlqResult.originalMessage).toEqual(invalidOrder);
+    expect(dlqResult!.error).toBe("Brakujące pola: [amount]");
+    expect(dlqResult!.originalMessage).toEqual(invalidOrder);
 
-    const processedResult = await waitForMessage(
+    const processedResult = await waitForMessage<ProcessedOrder>(
       ORDERS_PROCESSED_TOPIC,
       (message) => message.orderId === order.orderId,
       2,
@@ -129,16 +131,16 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     await sendRaw(producer, invalidJson, key);
 
-    const dlqResult = await waitForMessage(
+    const dlqResult = await waitForMessage<DlqMessage>(
       ORDERS_DLQ_TOPIC,
       (message) =>
-        message.error?.startsWith("Niepoprawny JSON:") &&
+        message.error.startsWith("Niepoprawny JSON:") &&
         message.raw === invalidJson,
     );
 
     expect(dlqResult).not.toBeNull();
-    expect(dlqResult.error).toContain("Niepoprawny JSON:");
-    expect(dlqResult.raw).toBe(invalidJson);
+    expect(dlqResult!.error).toContain("Niepoprawny JSON:");
+    expect(dlqResult!.raw).toBe(invalidJson);
   });
 
   it("przetwarza wiadomość w limicie czasu (SLA 10s)", async () => {
@@ -147,7 +149,7 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
 
     await sendOrder(producer, order);
 
-    const result = await waitForMessage(
+    const result = await waitForMessage<ProcessedOrder>(
       ORDERS_PROCESSED_TOPIC,
       (message) => message.orderId === order.orderId,
       10,
@@ -156,8 +158,8 @@ describe("Przepływ przetwarzania zamówień przez Kafkę", () => {
     const elapsed = Date.now() - start;
 
     expect(result).not.toBeNull();
-    expect(result.orderId).toBe(order.orderId);
-    expect(result.status).toBe("PROCESSED");
+    expect(result!.orderId).toBe(order.orderId);
+    expect(result!.status).toBe("PROCESSED");
     expect(elapsed).toBeLessThanOrEqual(10_000);
   });
 });

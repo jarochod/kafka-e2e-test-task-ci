@@ -48,8 +48,17 @@ export interface Order {
   status: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type MatchFn = (value: any) => boolean;
+export interface ProcessedOrder extends Order {
+  status: "PROCESSED";
+}
+
+export interface DlqMessage {
+  error: string;
+  originalMessage?: Partial<Order>;
+  raw?: string;
+}
+
+export type MatchFn<T> = (value: T) => boolean;
 
 let sharedProducer: Producer | null = null;
 
@@ -113,8 +122,7 @@ function newConsumer(): Consumer {
   return kafka.consumer({ groupId: `test-${randomUUID()}` });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function tryParse(value: Buffer | null): any | null {
+function tryParse(value: Buffer | null): unknown | null {
   if (!value) return null;
   try {
     return JSON.parse(value.toString("utf-8"));
@@ -127,12 +135,11 @@ function tryParse(value: Buffer | null): any | null {
  * Czeka aż w danym topicu pojawi się wiadomość spełniająca matchFn(value) -> boolean.
  * Zwraca sparsowaną wiadomość albo null, jeśli nie znaleziono w limicie czasu.
  */
-export async function waitForMessage(
+export async function waitForMessage<T>(
   topic: string,
-  matchFn: MatchFn,
+  matchFn: MatchFn<T>,
   timeoutSeconds: number = DEFAULT_POLL_TIMEOUT_SECONDS
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any | null> {
+): Promise<T | null> {
   const consumer = newConsumer();
   await consumer.connect();
   await consumer.subscribe({ topic, fromBeginning: true });
@@ -140,7 +147,7 @@ export async function waitForMessage(
   return new Promise((resolve, reject) => {
     let settled = false;
 
-    const finish = (result: unknown) => {
+    const finish = (result: T | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -163,8 +170,8 @@ export async function waitForMessage(
           if (settled) return;
 
           const parsed = tryParse(message.value);
-          if (parsed !== null && matchFn(parsed)) {
-            finish(parsed);
+          if (parsed !== null && matchFn(parsed as T)) {
+            finish(parsed as T);
           }
         },
       })
@@ -178,19 +185,17 @@ export async function waitForMessage(
 }
 
 /** Zbiera do expectedCount wiadomości spełniających matchFn w limicie czasu. */
-export async function collectMessages(
+export async function collectMessages<T>(
   topic: string,
-  matchFn: MatchFn,
+  matchFn: MatchFn<T>,
   expectedCount: number,
   timeoutSeconds: number = DEFAULT_POLL_TIMEOUT_SECONDS
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any[]> {
+): Promise<T[]> {
   const consumer = newConsumer();
   await consumer.connect();
   await consumer.subscribe({ topic, fromBeginning: true });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const found: any[] = [];
+  const found: T[] = [];
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -218,8 +223,8 @@ export async function collectMessages(
           if (settled) return;
 
           const parsed = tryParse(message.value);
-          if (parsed !== null && matchFn(parsed)) {
-            found.push(parsed);
+          if (parsed !== null && matchFn(parsed as T)) {
+            found.push(parsed as T);
             if (found.length >= expectedCount) {
               finish();
             }
