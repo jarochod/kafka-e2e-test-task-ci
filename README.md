@@ -77,6 +77,7 @@ docker compose down -v
 
 * Testy sprawdzają pełny przepływ E2E: wysyłają wiadomości na `orders` i weryfikują wynik na `orders-processed` lub `orders-dlq`.
 * Do synchronizacji używam `waitForMessage()` i `collectMessages()` z timeoutem zamiast stałych opóźnień. Matchery wykorzystują unikalne `orderId`, dzięki czemu testy nie dopasowują przypadkowo starszych wiadomości.
+* Helpery są typowane generycznie (`waitForMessage<T>`, `collectMessages<T>`), a dla wiadomości przetworzonych i DLQ zdefiniowane są dedykowane typy. Granicę parsowania JSON pozostawiam jako `unknown`, a konkretny typ wiadomości określany jest po stronie wywołania helpera.
 * Poprawiłem kolejność cleanupu w `waitForMessage()` i `collectMessages()`, tak aby `consumer.disconnect()` nie blokował zwrócenia wyniku do asercji.
 * Testowe consumery mają unikalne `groupId` i czytają topic od początku, co zapewnia izolację testów.
 
