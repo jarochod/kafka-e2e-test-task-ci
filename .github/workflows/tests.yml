@@ -1,0 +1,21 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, master, sandbox/kafka-experiments-clean-helpers ]
+  pull_request:
+    branches: [ main, master, sandbox/kafka-experiments-clean-helpers ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start services (Kafka, Consumer)
+        run: docker compose up --build -d
+
+      - name: Build and Run Tests
+        run: docker compose --profile test build tests && docker compose --profile test run --rm tests
