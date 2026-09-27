@@ -5,6 +5,7 @@ on:
     branches: [ main, master, sandbox/kafka-experiments-clean-helpers ]
   pull_request:
     branches: [ main, master, sandbox/kafka-experiments-clean-helpers ]
+  workflow_dispatch:
 
 jobs:
   test:
