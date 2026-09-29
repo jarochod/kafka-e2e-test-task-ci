@@ -80,6 +80,7 @@ docker compose down -v
 * Helpery są typowane generycznie (`waitForMessage<T>`, `collectMessages<T>`), a dla wiadomości przetworzonych i DLQ zdefiniowane są dedykowane typy. Granicę parsowania JSON pozostawiam jako `unknown`, a konkretny typ wiadomości określany jest po stronie wywołania helpera.
 * Poprawiłem kolejność cleanupu w `waitForMessage()` i `collectMessages()`, tak aby `consumer.disconnect()` nie blokował zwrócenia wyniku do asercji.
 * Testowe consumery mają unikalne `groupId` i czytają topic od początku, co zapewnia izolację testów.
+* Skonfigurowano CI w GitHub Actions – testy uruchamiają się automatycznie w Docker Compose po zmianach w kodzie oraz na żądanie (`workflow_dispatch`).
 
 ### Znane ograniczenia / co zrobiłbym/zrobiłabym inaczej mając więcej czasu
 
